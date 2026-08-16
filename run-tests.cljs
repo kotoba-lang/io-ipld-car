@@ -5,7 +5,8 @@
 
      nbb --classpath \"$(clojure -Spath)\" run-tests.cljs"
   (:require [cljs.test :as t]
-            [ipld.car-test]))
+            [ipld.car-test]
+            [ipld.car.trustless-test]))
 
 (defmethod t/report [:cljs.test/default :end-run-tests] [m]
   (println (str "\nnbb: " (:test m) " tests, " (:pass m) " passed, "
@@ -13,4 +14,4 @@
   (when (pos? (+ (or (:fail m) 0) (or (:error m) 0)))
     (set! (.-exitCode js/process) 1)))
 
-(t/run-tests 'ipld.car-test)
+(t/run-tests 'ipld.car-test 'ipld.car.trustless-test)

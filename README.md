@@ -58,6 +58,7 @@ question, and it belongs to `kotobase`, not to a spec mirror.
 | `ipld.car` | CARv1 — header, frames, offsets, `verify-block` |
 | `ipld.car.v2` | the pragma + 40-byte header, `pack`, `locate`, `range-header`, `read-frame` |
 | `ipld.car.index` | `MultihashIndexSorted` (multicodec `0x0401`) |
+| `ipld.car.trustless` | bounded IPLD selector/path execution → root-first CARv1 proof payload |
 
 Two offset vocabularies exist and are deliberately never merged: the CARv2
 index stores a **payload offset** (relative to the CARv1 payload, pointing at
@@ -67,6 +68,20 @@ both under different names and `locate` only ever returns the file offset.
 
 Nothing here fetches. The byte source is the caller's — the same code runs in
 a Cloudflare Worker, a browser and a JVM test.
+
+## Trustless selection and pathing
+
+`ipld.car.trustless/path-car` connects the selector engine in `io-ipld` to the
+CAR writer. Every fetched block is CID-verified, traversal requires explicit
+block/byte/depth/match limits, and the response contains exactly the unique
+root-first blocks touched while resolving the logical Data Model path. A Null
+value remains distinguishable from a missing path.
+
+This is the verifiable payload core, not the entire IPFS HTTP Gateway spec.
+The edge adapter still owns URL/path escaping, query parameters, redirects,
+status codes, caching, Range handling, and content negotiation. Likewise,
+GraphSync framing can consume the same ordered block selection without making
+CAR the GraphSync wire protocol.
 
 ## What is verified, and by whom
 
