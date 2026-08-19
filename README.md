@@ -119,6 +119,57 @@ npx nbb --classpath "$(clojure -Spath)" test/interop/reference_car.cljs
 
 16 tests / 54 assertions on both runtimes; 10 interop checks.
 
+## What packing is worth, counted (2026-08-19)
+
+`script/round_trips.cljs` answers the homework in superproject ADR-2608198000
+and cloud-itonami-app ADR-0057: a block-per-object store issues **one request
+per block**, and what that costs was written down for one large file and never
+for the shape an agent actually writes — a tree of many small ones.
+
+```bash
+npm install
+nbb --classpath "src:<unixfs>/src:<io-ipld>/src:<io-multiformats>/src:<dev-protobuf>/src:<org-ietf-cbor>/src" \
+  script/round_trips.cljs <dir> [--cap=<bytes>]
+```
+
+Nothing talks to a network: the request count of a block-per-object store is a
+function of the block set, so counting blocks is exact rather than estimated.
+It is **not** a latency measurement; ADR-2608198000 says the indicator is the
+number of round trips and this reports that and nothing else.
+
+Measured on two real work trees:
+
+| tree | files | bytes | blocks | block-per-object | packed |
+|---|---:|---:|---:|---:|---:|
+| `cloud-itonami/cloud-itonami-app` | 497 | 7.6 MiB | 510 | **510 PUTs** | **2 PUTs** |
+| `kotoba-lang/kekkai-node` | 75 | 353 KiB | 75 | **75 PUTs** | **1 PUT** |
+
+Two, not one, for the larger tree: a pack is an object like any other and
+`kotobase.archive-put/max-object-bytes` is 4 MiB. The first version of this
+script reported `1 request` for a 7.7 MiB pack — a number the archive would
+have refused. `--cap=` is the ceiling and it is applied, not assumed.
+
+Index cost lands where `io-ipld-car` already claims: 20.0 KiB across 510
+blocks, 3.0 KiB across 75 — about 40 bytes an entry.
+
+Two results worth not over-reading:
+
+- **Dedup within one tree is zero.** 510 blocks, 510 distinct CIDs. Content
+  addressing pays across commits and across agents holding the same base, not
+  inside a single snapshot, and a measurement of one tree cannot see that.
+- **Almost every file is one block.** 492 of 497 are under the 256 KiB chunk
+  size, so per-file reads are one GET either way; what packing buys on the read
+  side is the *whole-tree* fetch, which is the operation an agent materialising
+  a base actually performs.
+
+Three exit codes, because "measured" and "could not measure" must not look
+alike: `0` answered, `2` nothing to measure (empty tree), `3` refused — the
+grouping estimate produced a pack over the ceiling, so the request count would
+be one the object plane never agreed to. Unreadable files are counted and
+printed rather than skipped; a tracked tree with 231 of them (`inga`, whose
+`node_modules` is committed but absent locally) reports that instead of
+quietly measuring a third of itself.
+
 ## Deliberate limits
 
 - **CIDv1 only.** A CIDv0 block is recognised so it can be rejected by name;
