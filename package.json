@@ -5,9 +5,7 @@
     "test:nbb": "nbb --classpath \"$(clojure -Spath)\" run-tests.cljs",
     "test:interop": "nbb --classpath \"$(clojure -Spath)\" test/interop/reference_car.cljs"
   },
-  "dependencies": {
-    "@noble/hashes": "^1.4.0"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@ipld/car": "^5.4.7",
     "multiformats": "^14.0.5",
