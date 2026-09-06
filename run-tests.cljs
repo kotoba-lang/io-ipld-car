@@ -7,7 +7,8 @@
   (:require [cljs.test :as t]
             [ipld.car-test]
             [ipld.car.trustless-test]
-            [ipld.car.index-limits-test]))
+            [ipld.car.index-limits-test]
+            [ipld.car.replay-test]))
 
 (defmethod t/report [:cljs.test/default :end-run-tests] [m]
   (println (str "\nnbb: " (:test m) " tests, " (:pass m) " passed, "
@@ -15,4 +16,4 @@
   (when (pos? (+ (or (:fail m) 0) (or (:error m) 0)))
     (set! (.-exitCode js/process) 1)))
 
-(t/run-tests 'ipld.car-test 'ipld.car.trustless-test 'ipld.car.index-limits-test)
+(t/run-tests 'ipld.car-test 'ipld.car.trustless-test 'ipld.car.index-limits-test 'ipld.car.replay-test)
