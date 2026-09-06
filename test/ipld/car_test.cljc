@@ -73,7 +73,9 @@
         (v2/pack {:roots [(:cid root-node)] :blocks blocks})]
     (is (= 51 data-offset) "11-byte pragma + 40-byte header")
     (is (= {:data-offset data-offset :data-size data-size :index-offset index-offset}
-           (v2/parse-header bytes)))
+           (dissoc (v2/parse-header bytes) :characteristics)))
+    (is (v2/no-characteristics? (v2/parse-header bytes))
+        "this library writes the bitfield clear because it promises no characteristic")
     (is (= index-offset (+ data-offset data-size)))
     (is (b/equal? v2/pragma (b/slice bytes 0 11)))))
 

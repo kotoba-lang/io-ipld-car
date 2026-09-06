@@ -13,7 +13,8 @@
   not slow; it did not finish, and a `setTimeout` racing it never fired."
   (:require [clojure.test :refer [deftest is testing]]
             [ipld.car.bytes :as b]
-            [ipld.car.index :as idx]))
+            [ipld.car.index :as idx]
+            [ipld.car.v2 :as car2]))
 
 (defn- err [f]
   (try (f) nil
@@ -74,3 +75,20 @@
              (err #(idx/decode buf 0 {:max-records 63})))))
     (testing "the default ceiling admits an ordinary pack index"
       (is (= 64 (count (idx/decode buf 0)))))))
+
+(deftest characteristics_are_returned_so_a_reader_can_decline
+  (testing "an ordinary archive declares nothing, and says so"
+    (let [head (b/concat [car2/pragma
+                          (car2/header {:data-offset 51 :data-size 10
+                                        :index-offset 61})])
+          parsed (car2/parse-header head)]
+      (is (= 16 (b/bcount (:characteristics parsed))))
+      (is (car2/no-characteristics? parsed))))
+  (testing "a set bit survives parsing instead of being skipped"
+    (let [head (b/concat [car2/pragma
+                          (b/->bytes (concat [0x80] (repeat 15 0)))
+                          (b/u64-le 51) (b/u64-le 10) (b/u64-le 61)])
+          parsed (car2/parse-header head)]
+      (is (not (car2/no-characteristics? parsed))
+          "ignoring a declaration and honouring it must not look the same")
+      (is (= 51 (:data-offset parsed)) "the rest of the header still parses"))))
