@@ -108,7 +108,29 @@
             (bit-and (unsigned-bit-shift-right n 16) 0xff)
             (bit-and (unsigned-bit-shift-right n 24) 0xff)]))
 
+(defn need!
+  "Assert that `[off, off+n)` lies inside `b`, and return `off`.
+
+  Every fixed-width read below goes through this, and the reason is a
+  disagreement rather than tidiness. Out of range, JVM `aget` throws and
+  JavaScript `aget` yields `undefined`, so `read-u32-le` returns `NaN` on
+  ClojureScript -- and `NaN` fails every comparison silently: a loop written
+  `(= i n)` against a `NaN` count never ends, and `(> v max-safe-integer)`
+  is false for `NaN`, so even this namespace's own range guard passes it
+  through. Measured 2026-09-06 on nbb, a truncated CARv2 index decoded that
+  way did not terminate and did not yield the event loop.
+
+  A read that could not be performed must not return a value shaped like one
+  that could. This is the check that makes the two runtimes agree."
+  [b off n]
+  (when (or (neg? off) (neg? n) (> (+ off n) (bcount b)))
+    (throw (ex-info "car: read outside buffer"
+                    {:type :car/read-out-of-range
+                     :offset off :width n :size (bcount b)})))
+  off)
+
 (defn read-u32-le [b off]
+  (need! b off 4)
   (+ (bget b off)
      (* 256 (bget b (+ off 1)))
      (* 65536 (bget b (+ off 2)))
@@ -127,6 +149,7 @@
     (concat [(u32-le lo) (u32-le hi)])))
 
 (defn read-u64-le [b off]
+  (need! b off 8)
   (let [lo (read-u32-le b off)
         hi (read-u32-le b (+ off 4))
         v  (+ lo (* hi 4294967296))]

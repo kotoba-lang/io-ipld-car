@@ -39,7 +39,15 @@
              (b/u64-le (or index-offset 0))]))
 
 (defn parse-header
-  "Read pragma + header. Returns `{:data-offset :data-size :index-offset}`."
+  "Read pragma + header.
+
+  Returns `{:characteristics :data-offset :data-size :index-offset}`.
+
+  `:characteristics` is the raw 16-byte bitfield. It is returned rather than
+  skipped because it is the archive telling a reader that it is not an
+  ordinary one, and a reader that never looks cannot decline. `header` above
+  writes it clear precisely because this library promises no characteristic;
+  see `no-characteristics?` for the matching read side."
   [buf]
   (when (< (b/bcount buf) data-offset)
     (throw (ex-info "car: buffer shorter than a CARv2 pragma + header"
@@ -47,9 +55,23 @@
   (when-not (b/equal? (b/slice buf 0 pragma-length) pragma)
     (throw (ex-info "car: not a CARv2 (pragma mismatch)"
                     {:type :car/not-carv2})))
-  {:data-offset (b/read-u64-le buf (+ pragma-length 16))
+  {:characteristics (b/slice buf pragma-length (+ pragma-length 16))
+   :data-offset (b/read-u64-le buf (+ pragma-length 16))
    :data-size (b/read-u64-le buf (+ pragma-length 24))
    :index-offset (b/read-u64-le buf (+ pragma-length 32))})
+
+(defn no-characteristics?
+  "Is every characteristic bit clear?
+
+  This library implements no characteristic, so this is the whole of what it
+  can honestly say about the field: either the archive asks for nothing
+  special, or it asks for something this reader does not implement. Naming
+  which bit was set would be a claim about semantics this code does not
+  have -- a caller that wants one reads `:characteristics` itself. The point
+  is that ignoring a set bit and understanding it must not look the same."
+  [{:keys [characteristics]}]
+  (and (some? characteristics)
+       (every? zero? (map #(b/bget characteristics %) (range (b/bcount characteristics))))))
 
 ;; ── writing ──────────────────────────────────────────────────────────────────
 
