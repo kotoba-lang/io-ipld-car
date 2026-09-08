@@ -2,7 +2,12 @@
  ;; CAR is a byte container for blocks io-ipld already knows how to make:
  ;; multiformats supplies CIDv1 assembly + base32, io-ipld the DAG-CBOR header
  ;; and the tag-42 root links. This repo owns framing, offsets and the index.
- :deps {io.github.kotoba-lang/io-ipld {:git/sha "48ba40490cf082a1473986ac757b8e2b214a3d1b"}
+ :deps {
+        ;; kotoba.lang.text, not clojure.string. Pinned as an explicit floor:
+        ;; tools.deps takes the NEWEST sha it is shown, so without a floor here
+        ;; this repo silently rides whatever a sibling happens to name.
+        io.github.kotoba-lang/text {:git/sha "73bdb13ae7a3d004b44bca08be03a3191157a38f"}
+       io.github.kotoba-lang/io-ipld {:git/sha "48ba40490cf082a1473986ac757b8e2b214a3d1b"}
         io.github.kotoba-lang/io-multiformats {:git/sha "561fe7dfada3db852b127f06d41750dabd3cead9"}}
  :aliases
  {:test {:extra-paths ["test"]

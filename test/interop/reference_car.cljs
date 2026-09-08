@@ -12,7 +12,7 @@
   It is nbb rather than a `.mjs` harness because this workspace writes Node
   test drivers in nbb (root CLAUDE.md), and because the same `.cljc` under
   test is what a Worker will run."
-  (:require [ipld.car :as car]
+  (:require [kotoba.lang.text] [ipld.car :as car]
             [ipld.car.bytes :as b]
             [ipld.car.index :as idx]
             [ipld.car.v2 :as v2]
@@ -166,7 +166,7 @@
                   (and (= (b/bcount want) (.-length got))
                        (every? #(= (b/bget want %) (.charCodeAt got %))
                                (range (b/bcount want)))))
-          (println (str "        " (clojure.string/replace (.trim report) #"\n" "\n        "))))
+          (println (str "        " (kotoba.lang.text/replace (.trim report) #"\n" "\n        "))))
         (catch :default e
           (check! (str "car inspect --full: " (.-message e)) false))
         (finally (.unlinkSync fs good)))
@@ -189,7 +189,7 @@
                                (str "all checks passed"
                                     (when (seq @skipped)
                                       (str "; " (count @skipped) " SKIPPED — not verified: "
-                                           (clojure.string/join ", " @skipped))))
+                                           (kotoba.lang.text/join ", " @skipped))))
                                (str @failures " FAILED"))))
                (when (pos? @failures) (set! (.-exitCode js/process) 1))))))
 
