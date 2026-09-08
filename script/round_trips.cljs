@@ -19,7 +19,7 @@
 ;; because a work tree is git-managed by definition in the design this
 ;; measures, and `.git` and `node_modules` are not part of what a bot commits.
 (ns round-trips
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [ipld.car.bytes :as cb]
             [ipld.car.v2 :as v2]
             [unixfs.file :as unixfs]
