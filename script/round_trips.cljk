@@ -1,7 +1,7 @@
 ;; How many requests does a work tree cost, per block and packed?
 ;;
 ;;   nbb --classpath "src:<unixfs>/src:<io-ipld>/src:<io-multiformats>/src:<dev-protobuf>/src" \
-;;     script/round_trips.cljs <dir>
+;;     script/round_trips.cljk <dir>
 ;;
 ;; The homework in superproject ADR-2608198000 / cloud-itonami-app ADR-0057:
 ;; that store issues **one request per block**, and ADR-0057 wrote down what
