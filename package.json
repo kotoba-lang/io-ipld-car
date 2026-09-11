@@ -2,8 +2,8 @@
   "name": "ipld-car",
   "private": true,
   "scripts": {
-    "test:nbb": "nbb --classpath \"$(clojure -Spath)\" run-tests.cljk",
-    "test:interop": "nbb --classpath \"$(clojure -Spath)\" test/interop/reference_car.cljk"
+    "test:nbb": "kbb --backend sci --classpath \"$(kbb -Spath)\" run-tests.cljk",
+    "test:interop": "kbb --backend sci --classpath \"$(kbb -Spath)\" test/interop/reference_car.cljk"
   },
   "dependencies": {},
   "devDependencies": {

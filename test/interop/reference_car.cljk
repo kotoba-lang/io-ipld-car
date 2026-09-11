@@ -7,7 +7,7 @@
   the only place where something that did not read our source decides whether
   the bytes are a CAR.
 
-  Run:  npx nbb --classpath \"$(clojure -Spath)\" test/interop/reference_car.cljk
+  Run:  kbb --backend sci --classpath \"$(kbb -Spath)\" test/interop/reference_car.cljk
 
   It is nbb rather than a `.mjs` harness because this workspace writes Node
   test drivers in nbb (root CLAUDE.md), and because the same `.cljc` under

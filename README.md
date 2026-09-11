@@ -111,10 +111,10 @@ summary ends `1 SKIPPED — not verified: …`. A skipped check never reads as a
 passed one.
 
 ```bash
-clojure -M:test                                              # JVM
-npx nbb --classpath "$(clojure -Spath)" run-tests.cljk        # nbb / SCI
+kbb -M:test                                              # JVM
+kbb --backend sci --classpath "$(kbb -Spath)" run-tests.cljk        # nbb / SCI
 go install github.com/ipld/go-car/cmd/car@latest
-npx nbb --classpath "$(clojure -Spath)" test/interop/reference_car.cljk
+kbb --backend sci --classpath "$(kbb -Spath)" test/interop/reference_car.cljk
 ```
 
 16 tests / 54 assertions on both runtimes; 10 interop checks.
@@ -128,7 +128,7 @@ for the shape an agent actually writes — a tree of many small ones.
 
 ```bash
 npm install
-nbb --classpath "src:<unixfs>/src:<io-ipld>/src:<io-multiformats>/src:<dev-protobuf>/src:<org-ietf-cbor>/src" \
+kbb --backend sci --classpath "src:<unixfs>/src:<io-ipld>/src:<io-multiformats>/src:<dev-protobuf>/src:<org-ietf-cbor>/src" \
   script/round_trips.cljk <dir> [--cap=<bytes>]
 ```
 
