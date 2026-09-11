@@ -85,9 +85,9 @@ CAR the GraphSync wire protocol.
 
 ## What is verified, and by whom
 
-Everything in `test/ipld/car_test.cljc` is this library agreeing with itself,
+Everything in `test/ipld/car_test.cljk` is this library agreeing with itself,
 which a writer and a reader built from the same misreading would also do.
-`test/interop/reference_car.cljs` is therefore the suite that counts: it hands
+`test/interop/reference_car.cljk` is therefore the suite that counts: it hands
 the bytes to implementations that never read this source.
 
 | check | judged by |
@@ -112,16 +112,16 @@ passed one.
 
 ```bash
 clojure -M:test                                              # JVM
-npx nbb --classpath "$(clojure -Spath)" run-tests.cljs        # nbb / SCI
+npx nbb --classpath "$(clojure -Spath)" run-tests.cljk        # nbb / SCI
 go install github.com/ipld/go-car/cmd/car@latest
-npx nbb --classpath "$(clojure -Spath)" test/interop/reference_car.cljs
+npx nbb --classpath "$(clojure -Spath)" test/interop/reference_car.cljk
 ```
 
 16 tests / 54 assertions on both runtimes; 10 interop checks.
 
 ## What packing is worth, counted (2026-08-19)
 
-`script/round_trips.cljs` answers the homework in superproject ADR-2608198000
+`script/round_trips.cljk` answers the homework in superproject ADR-2608198000
 and cloud-itonami-app ADR-0057: a block-per-object store issues **one request
 per block**, and what that costs was written down for one large file and never
 for the shape an agent actually writes — a tree of many small ones.
@@ -129,7 +129,7 @@ for the shape an agent actually writes — a tree of many small ones.
 ```bash
 npm install
 nbb --classpath "src:<unixfs>/src:<io-ipld>/src:<io-multiformats>/src:<dev-protobuf>/src:<org-ietf-cbor>/src" \
-  script/round_trips.cljs <dir> [--cap=<bytes>]
+  script/round_trips.cljk <dir> [--cap=<bytes>]
 ```
 
 Nothing talks to a network: the request count of a block-per-object store is a

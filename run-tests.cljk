@@ -3,7 +3,7 @@
 
    Run it with the sibling checkouts on the classpath:
 
-     nbb --classpath \"$(clojure -Spath)\" run-tests.cljs"
+     nbb --classpath \"$(clojure -Spath)\" run-tests.cljk"
   (:require [cljs.test :as t]
             [ipld.car-test]
             [ipld.car.trustless-test]
