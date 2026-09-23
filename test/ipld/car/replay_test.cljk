@@ -9,7 +9,7 @@
 
   The fixtures are the four ADR-2609060000 names: missing blocks, shared
   links, unsupported forms, and limits."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [ipld.car :as car]
             [ipld.car.trustless :as tl]
             [ipld.core :as ipld]

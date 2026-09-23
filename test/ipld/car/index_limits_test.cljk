@@ -11,7 +11,7 @@
   index did not fail -- `read-u32-le` past the end returned `NaN`, `(= j NaN)`
   was never true, and `decode` spun without yielding the event loop. It was
   not slow; it did not finish, and a `setTimeout` racing it never fired."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.test :refer [deftest is testing]]
             [ipld.car.bytes :as b]
             [ipld.car.index :as idx]
             [ipld.car.v2 :as car2]))
