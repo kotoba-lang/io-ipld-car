@@ -5,7 +5,8 @@
             [ipld.car.bytes :as b]
             [ipld.car.index :as idx]
             [ipld.car.v2 :as v2]
-            [ipld.core :as ipld]))
+            [ipld.core :as ipld]
+            [multiformats.core :as mf]))
 
 (defn- block [node] (ipld/node->block node))
 
@@ -65,6 +66,71 @@
 (deftest verify-block-catches-substitution
   (is (thrown? #?(:clj Exception :cljs js/Error)
                (car/verify-block (:cid leaf-a) (:bytes leaf-b)))))
+
+(deftest streaming-carv1-matches-buffered-writer-and-reports-offsets
+  (let [parts (atom [])
+        entries (atom [])
+        result (car/stream-encode!
+                {:roots [(:cid root-node)] :blocks blocks :max-bytes 100000
+                 :write! (fn [part] (swap! parts conj part) (b/bcount part))
+                 :on-entry! #(swap! entries conj %)})
+        buffered (car/encode {:roots [(:cid root-node)] :blocks blocks})
+        actual (b/concat @parts)]
+    (is (= 4 (count @parts)) "one header and one write per block")
+    (is (b/equal? (:bytes buffered) actual))
+    (is (= (:entries buffered) @entries))
+    (is (= (b/bcount actual) (:bytes-written result)))
+    (is (= 3 (:block-count result)))
+    (is (= [(:cid root-node)] (:roots (car/decode actual))))))
+
+(deftest streaming-carv1-verifies-dag-pb-by-cid-without-decoding-protobuf
+  (let [invalid-protobuf (b/->bytes [255 0 1 2 3])
+        cid (mf/cidv1 0x70 (mf/multihash-sha256 invalid-protobuf))
+        parts (atom [])]
+    (is (b/equal? invalid-protobuf
+                  (car/verify-sha2-256-block cid invalid-protobuf)))
+    (is (= 1 (:block-count
+              (car/stream-encode!
+               {:roots [cid] :blocks [{:cid cid :bytes invalid-protobuf}]
+                :max-bytes 1000
+                :write! (fn [part] (swap! parts conj part) (b/bcount part))}))))
+    (is (b/equal? invalid-protobuf
+                  (get-in (car/decode (b/concat @parts)) [:blocks cid])))
+    (is (= :car/cid-mismatch
+           (:type (ex-data
+                   (try (car/verify-sha2-256-block cid (b/->bytes [0]))
+                        (catch #?(:clj Exception :cljs js/Error) e e))))))))
+
+(deftest streaming-carv1-refuses-missing-roots-short-writes-and-byte-overflow
+  (let [cid (:cid root-node)
+        block root-node
+        full-size (b/bcount (:bytes (car/encode {:roots [cid] :blocks [block]})))
+        sink (fn [part] (b/bcount part))]
+    (is (= full-size (:bytes-written
+                      (car/stream-encode! {:roots [cid] :blocks [block]
+                                           :max-bytes full-size :write! sink}))))
+    (is (= :car/stream-byte-ceiling
+           (:type (ex-data
+                   (try (car/stream-encode! {:roots [cid] :blocks [block]
+                                             :max-bytes (dec full-size) :write! sink})
+                        (catch #?(:clj Exception :cljs js/Error) e e))))))
+    (is (= :car/missing-root
+           (:type (ex-data
+                   (try (car/stream-encode! {:roots [cid] :blocks [leaf-a]
+                                             :max-bytes 100000 :write! sink})
+                        (catch #?(:clj Exception :cljs js/Error) e e))))))
+    (is (= :car/short-write
+           (:type (ex-data
+                   (try (car/stream-encode! {:roots [cid] :blocks [block]
+                                             :max-bytes 100000
+                                             :write! (fn [part] (dec (b/bcount part)))})
+                        (catch #?(:clj Exception :cljs js/Error) e e))))))
+    (is (= :car/cid-mismatch
+           (:type (ex-data
+                   (try (car/stream-encode! {:roots [cid]
+                                             :blocks [(assoc block :bytes (:bytes leaf-a))]
+                                             :max-bytes 100000 :write! sink})
+                        (catch #?(:clj Exception :cljs js/Error) e e))))))))
 
 ;; ── CARv2 ────────────────────────────────────────────────────────────────────
 

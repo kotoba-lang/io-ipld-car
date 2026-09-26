@@ -55,7 +55,7 @@ question, and it belongs to `kotobase`, not to a spec mirror.
 
 | ns | owns |
 |---|---|
-| `ipld.car` | CARv1 — header, frames, offsets, `verify-block` |
+| `ipld.car` | CARv1 — header, frames, offsets, verified `stream-encode!` |
 | `ipld.car.v2` | the pragma + 40-byte header, `pack`, `locate`, `range-header`, `read-frame` |
 | `ipld.car.index` | `MultihashIndexSorted` (multicodec `0x0401`) |
 | `ipld.car.trustless` | bounded IPLD selector/path execution → root-first CARv1 proof payload |
@@ -68,6 +68,21 @@ both under different names and `locate` only ever returns the file offset.
 
 Nothing here fetches. The byte source is the caller's — the same code runs in
 a Cloudflare Worker, a browser and a JVM test.
+
+For a large block set, `ipld.car/stream-encode!` takes an ordered, reducible
+block source and writes one verified CARv1 frame at a time. Its `write!` sink
+must synchronously consume each byte container and return the exact byte count.
+Supply a positive `max-bytes` ceiling for the whole archive. The result gives
+the total byte count and block count; `on-entry!` can record offsets separately
+without retaining the archive or its index in memory. Write to a temporary
+target and discard it if any call fails, since a failed write can leave a
+partial CAR. Every declared root must be among the written blocks.
+
+For CIDv0 sources, convert each CID to its equivalent CIDv1 dag-pb identity
+before calling this writer. It accepts CIDv1 blocks with sha2-256 multihashes,
+checks their digests against the original bytes, and rejects other hashes. A
+CAR file alone does not establish Filecoin custody or retrieval: the caller
+still needs an external archive digest, provider handoff, and retrieval proof.
 
 ## Trustless selection and pathing
 
@@ -93,7 +108,7 @@ the bytes to implementations that never read this source.
 | check | judged by |
 |---|---|
 | we parse their roots, order and block bytes | `@ipld/car` (JS reference) writes, we read |
-| **our CARv1 is byte-identical to theirs** | same fixture, both writers |
+| **our buffered and streamed CARv1 are byte-identical to theirs** | same fixture, all three writers |
 | a CARv2 we packed reads back block-for-block | `@ipld/car` reads |
 | `car inspect --full` accepts the archive and names `car-multihash-index-sorted` | `go-car` |
 | `car get-block` returns that block's exact bytes | `go-car`, via our index |
@@ -111,13 +126,13 @@ summary ends `1 SKIPPED — not verified: …`. A skipped check never reads as a
 passed one.
 
 ```bash
-kbb -M:test                                              # JVM
-kbb --backend sci --classpath "$(kbb -Spath)" run-tests.cljk        # nbb / SCI
+kbb --backend sci --classpath "$(kbb -Spath)" run-tests.cljk
 go install github.com/ipld/go-car/cmd/car@latest
 kbb --backend sci --classpath "$(kbb -Spath)" test/interop/reference_car.cljk
 ```
 
-16 tests / 54 assertions on both runtimes; 10 interop checks.
+The suite prints the current test and assertion counts. The optional go-car
+checks report SKIP when the CLI is unavailable.
 
 ## What packing is worth, counted (2026-08-19)
 
@@ -177,9 +192,10 @@ quietly measuring a third of itself.
 - **Offsets are bounded at 2^53-1.** The format permits a full uint64 and a
   JavaScript host cannot hold one exactly, so encoding one here would produce
   a file whose offsets differ by runtime. `u64-le` refuses rather than round.
-- **No streaming.** `decode` takes the whole archive, because a caller that
-  already holds the bytes should not pretend otherwise; a caller that holds
-  only a range uses `v2/read-frame`, which never assumes it has the rest.
+- **Streaming write, buffered decode.** `stream-encode!` writes a CARv1 frame
+  at a time; `decode` still takes the whole archive. A caller that holds only
+  a range uses `v2/read-frame`, which never assumes it has the rest. CARv2
+  `pack` still buffers its payload and index.
 - **The "fully indexed" characteristic bit is left clear.** This library does
   not promise that property, so it does not assert it.
 - Only `MultihashIndexSorted` (`0x0401`) is written or read. `IndexSorted`

@@ -87,6 +87,13 @@
       (.write w #js {:cid c :bytes (->u8 (:bytes blk))}))
     (let [theirs (.close w)
           ours (:bytes (car/encode {:roots [(:cid root)] :blocks blocks}))
+          stream-parts (atom [])
+          stream-result (car/stream-encode!
+                         {:roots [(:cid root)] :blocks blocks :max-bytes total
+                          :write! (fn [part]
+                                    (swap! stream-parts conj part)
+                                    (b/bcount part))})
+          streamed (b/concat @stream-parts)
           parsed (car/decode theirs)]
       (check! "we parse their roots" (= [(:cid root)] (:roots parsed)))
       (check! "we parse their block order" (= (mapv :cid blocks) (mapv :cid (:entries parsed))))
@@ -95,7 +102,11 @@
                       blocks))
       (check! (str "our CARv1 is byte-identical to theirs ("
                    (b/bcount ours) " vs " (b/bcount theirs) " bytes)")
-              (b/equal? ours theirs)))))
+              (b/equal? ours theirs))
+      (check! "our streamed CARv1 is byte-identical to the reference writer"
+              (and (= total (:bytes-written stream-result))
+                   (= (count blocks) (:block-count stream-result))
+                   (b/equal? streamed theirs))))))
 
 (defn- car-cli
   "The go-car CLI, or nil. `@ipld/car` does not read a CARv2 index, so it
