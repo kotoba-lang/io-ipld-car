@@ -148,3 +148,82 @@
       (throw (ex-info "car: block CID mismatch"
                       {:type :car/cid-mismatch :expected-cid cid :actual-cid actual})))
     bytes))
+
+(defn verify-sha2-256-block
+  "Verify raw bytes against any CIDv1 codec using a sha2-256 multihash.
+
+  CAR is a block container: dag-pb bytes need not be decoded as protobuf to
+  establish their CID. Other multihash algorithms are refused by name."
+  [cid bytes]
+  (let [{:keys [codec mh-code digest]} (read-cid (cid->bytes cid) 0)]
+    (when-not (and (= mh-code 0x12) (= (b/bcount digest) 32))
+      (throw (ex-info "car: unsupported multihash for block verification"
+                      {:type :car/unsupported-multihash :cid cid
+                       :mh-code mh-code :digest-length (b/bcount digest)})))
+    (let [actual (mf/cidv1 codec (mf/multihash-sha256 bytes))]
+      (when-not (= cid actual)
+        (throw (ex-info "car: block CID mismatch"
+                        {:type :car/cid-mismatch :expected-cid cid :actual-cid actual})))
+      bytes)))
+
+(defn stream-encode!
+  "Write a bounded CARv1 one verified block at a time.
+
+  write! must synchronously consume a byte container and return its exact
+  byte count. on-entry! receives offsets after each successful frame write.
+  No archive bytes or entry list are retained here. The caller must write to
+  a temporary target and discard it on any refusal, since earlier frames may
+  already have been written. Roots must be present among the supplied blocks.
+  max-bytes bounds the entire archive including its header."
+  [{:keys [roots blocks write! on-entry! max-bytes]}]
+  (when-not (and (fn? write!) (integer? max-bytes)
+                 (pos? max-bytes) (<= max-bytes b/max-safe-integer))
+    (throw (ex-info "car: streaming writer needs an exact sink and positive byte ceiling"
+                    {:type :car/invalid-stream-options})))
+  (let [roots (vec roots)]
+    (when (empty? roots)
+      (throw (ex-info "car: streaming archive needs at least one root"
+                      {:type :car/no-roots})))
+    (doseq [cid roots]
+      (read-cid (cid->bytes cid) 0))
+    (let [hdr (framed-header roots)
+          h-len (b/bcount hdr)]
+      (when (> h-len max-bytes)
+        (throw (ex-info "car: header exceeds streaming byte ceiling"
+                        {:type :car/stream-byte-ceiling :limit max-bytes})))
+      (when-not (= h-len (write! hdr))
+        (throw (ex-info "car: short header write" {:type :car/short-write})))
+      (let [{:keys [offset block-count seen-roots]}
+            (reduce
+             (fn [{:keys [offset block-count seen-roots]} {:keys [cid bytes] :as block}]
+               (verify-sha2-256-block cid bytes)
+               (let [frame-bytes (frame block)
+                     f-len (b/bcount frame-bytes)
+                     end (+ offset f-len)]
+                 (when (> end max-bytes)
+                   (throw (ex-info "car: frame exceeds streaming byte ceiling"
+                                   {:type :car/stream-byte-ceiling
+                                    :cid cid :limit max-bytes :needed end})))
+                 (when-not (= f-len (write! frame-bytes))
+                   (throw (ex-info "car: short block write"
+                                   {:type :car/short-write :cid cid})))
+                 (when on-entry!
+                   (let [cb-len (b/bcount (cid->bytes cid))
+                         vl (b/bcount (b/varint (+ cb-len (b/bcount bytes))))]
+                     (on-entry! {:cid cid :frame-offset offset
+                                 :frame-length f-len
+                                 :block-offset (+ offset vl cb-len)
+                                 :block-length (b/bcount bytes)})))
+                 {:offset end
+                  :block-count (inc block-count)
+                  :seen-roots (if (some #{cid} roots)
+                                (conj seen-roots cid) seen-roots)}))
+             {:offset h-len :block-count 0 :seen-roots #{}} blocks)]
+        (when (zero? block-count)
+          (throw (ex-info "car: streaming archive has no blocks"
+                          {:type :car/no-blocks})))
+        (when-not (= (set roots) seen-roots)
+          (throw (ex-info "car: streaming archive is missing a root block"
+                          {:type :car/missing-root
+                           :missing (vec (remove seen-roots roots))})))
+        {:bytes-written offset :block-count block-count :roots roots}))))
